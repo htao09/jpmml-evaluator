@@ -54,30 +54,31 @@ import org.jpmml.evaluator.VoteAggregator;
 
 public class ScorecardEvaluator extends ModelEvaluator<Scorecard> {
 
-	public ScorecardEvaluator(PMML pmml){
+	public ScorecardEvaluator(PMML pmml) {
 		this(pmml, PMMLUtil.findModel(pmml, Scorecard.class));
 	}
 
-	public ScorecardEvaluator(PMML pmml, Scorecard scorecard){
+	public ScorecardEvaluator(PMML pmml, Scorecard scorecard) {
 		super(pmml, scorecard);
 
 		Characteristics characteristics = scorecard.getCharacteristics();
-		if(characteristics == null){
+		if (characteristics == null) {
 			throw new MissingElementException(scorecard, PMMLElements.SCORECARD_CHARACTERISTICS);
 		} // End if
 
-		if(!characteristics.hasCharacteristics()){
+		if (!characteristics.hasCharacteristics()) {
 			throw new MissingElementException(characteristics, PMMLElements.CHARACTERISTICS_CHARACTERISTICS);
 		}
 	}
 
 	@Override
-	public String getSummary(){
+	public String getSummary() {
 		return "Scorecard";
 	}
 
 	@Override
-	protected <V extends Number> Map<FieldName, ?> evaluateRegression(ValueFactory<V> valueFactory, EvaluationContext context){
+	protected <V extends Number> Map<FieldName, ?> evaluateRegression(ValueFactory<V> valueFactory,
+			EvaluationContext context) {
 		Scorecard scorecard = getModel();
 
 		boolean useReasonCodes = scorecard.isUseReasonCodes();
@@ -88,21 +89,21 @@ public class ScorecardEvaluator extends ModelEvaluator<Scorecard> {
 
 		VoteAggregator<String, V> reasonCodePoints = null;
 
-		if(useReasonCodes){
+		if (useReasonCodes) {
 			reasonCodePoints = new VoteAggregator<>(valueFactory);
 		}
 
 		Characteristics characteristics = scorecard.getCharacteristics();
-		for(Characteristic characteristic : characteristics){
+		for (Characteristic characteristic : characteristics) {
 			Number baselineScore = null;
 
-			if(useReasonCodes){
+			if (useReasonCodes) {
 				baselineScore = characteristic.getBaselineScore();
-				if(baselineScore == null){
+				if (baselineScore == null) {
 					baselineScore = scorecard.getBaselineScore();
 				} // End if
 
-				if(baselineScore == null){
+				if (baselineScore == null) {
 					throw new MissingAttributeException(characteristic, PMMLAttributes.CHARACTERISTIC_BASELINESCORE);
 				}
 			}
@@ -110,16 +111,16 @@ public class ScorecardEvaluator extends ModelEvaluator<Scorecard> {
 			Number partialScore = null;
 
 			List<Attribute> attributes = characteristic.getAttributes();
-			for(Attribute attribute : attributes){
+			for (Attribute attribute : attributes) {
 				Boolean status = PredicateUtil.evaluatePredicateContainer(attribute, context);
-				if(status == null || !status.booleanValue()){
+				if (status == null || !status.booleanValue()) {
 					continue;
 				}
 
 				ComplexPartialScore complexPartialScore = attribute.getComplexPartialScore();
-				if(complexPartialScore != null){
+				if (complexPartialScore != null) {
 					FieldValue computedValue = ExpressionUtil.evaluateExpressionContainer(complexPartialScore, context);
-					if(FieldValueUtil.isMissing(computedValue)){
+					if (FieldValueUtil.isMissing(computedValue)) {
 						return TargetUtil.evaluateRegressionDefault(valueFactory, targetField);
 					}
 
@@ -128,35 +129,35 @@ public class ScorecardEvaluator extends ModelEvaluator<Scorecard> {
 
 				{
 					partialScore = attribute.getPartialScore();
-					if(partialScore == null){
+					if (partialScore == null) {
 						throw new MissingAttributeException(attribute, PMMLAttributes.ATTRIBUTE_PARTIALSCORE);
 					}
 				}
 
 				score.add(partialScore);
-
-				if(useReasonCodes){
+				score.add(partialScore);
+				if (useReasonCodes) {
 					String reasonCode = attribute.getReasonCode();
-					if(reasonCode == null){
+					if (reasonCode == null) {
 						reasonCode = characteristic.getReasonCode();
 					} // End if
 
-					if(reasonCode == null){
+					if (reasonCode == null) {
 						throw new MissingAttributeException(attribute, PMMLAttributes.ATTRIBUTE_REASONCODE);
 					}
 
 					Number difference;
 
 					Scorecard.ReasonCodeAlgorithm reasonCodeAlgorithm = scorecard.getReasonCodeAlgorithm();
-					switch(reasonCodeAlgorithm){
-						case POINTS_ABOVE:
-							difference = Functions.SUBTRACT.evaluate(partialScore, baselineScore);
-							break;
-						case POINTS_BELOW:
-							difference = Functions.SUBTRACT.evaluate(baselineScore, partialScore);
-							break;
-						default:
-							throw new UnsupportedAttributeException(scorecard, reasonCodeAlgorithm);
+					switch (reasonCodeAlgorithm) {
+					case POINTS_ABOVE:
+						difference = Functions.SUBTRACT.evaluate(partialScore, baselineScore);
+						break;
+					case POINTS_BELOW:
+						difference = Functions.SUBTRACT.evaluate(baselineScore, partialScore);
+						break;
+					default:
+						throw new UnsupportedAttributeException(scorecard, reasonCodeAlgorithm);
 					}
 
 					reasonCodePoints.add(reasonCode, difference);
@@ -165,14 +166,14 @@ public class ScorecardEvaluator extends ModelEvaluator<Scorecard> {
 				break;
 			}
 
-			// "If not even a single Attribute evaluates to "true" for a given Characteristic, then the scorecard as a whole returns an invalid value"
-			if(partialScore == null){
-				throw new UndefinedResultException()
-					.ensureContext(characteristic);
+			// "If not even a single Attribute evaluates to "true" for a given
+			// Characteristic, then the scorecard as a whole returns an invalid value"
+			if (partialScore == null) {
+				throw new UndefinedResultException().ensureContext(characteristic);
 			}
 		}
 
-		if(useReasonCodes){
+		if (useReasonCodes) {
 			ReasonCodeRanking<V> result = createReasonCodeRanking(targetField, score, reasonCodePoints.sumMap());
 
 			return TargetUtil.evaluateRegression(targetField, result);
@@ -181,16 +182,16 @@ public class ScorecardEvaluator extends ModelEvaluator<Scorecard> {
 		return TargetUtil.evaluateRegression(targetField, score);
 	}
 
-	static
-	private <V extends Number> ReasonCodeRanking<V> createReasonCodeRanking(TargetField targetField, Value<V> score, ValueMap<String, V> reasonCodePoints){
+	static private <V extends Number> ReasonCodeRanking<V> createReasonCodeRanking(TargetField targetField,
+			Value<V> score, ValueMap<String, V> reasonCodePoints) {
 		score = TargetUtil.evaluateRegressionInternal(targetField, score);
 
 		Collection<Map.Entry<String, Value<V>>> entrySet = reasonCodePoints.entrySet();
-		for(Iterator<Map.Entry<String, Value<V>>> it = entrySet.iterator(); it.hasNext(); ){
+		for (Iterator<Map.Entry<String, Value<V>>> it = entrySet.iterator(); it.hasNext();) {
 			Map.Entry<String, Value<V>> entry = it.next();
 
 			Value<V> value = entry.getValue();
-			if(value.compareTo(Numbers.DOUBLE_ZERO) < 0){
+			if (value.compareTo(Numbers.DOUBLE_ZERO) < 0) {
 				it.remove();
 			}
 		}
